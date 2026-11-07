@@ -1,0 +1,12 @@
+.{
+    .name = .zig_scheduler,
+    .version = "0.0.0",
+    .fingerprint = 0xabe1ac7100302b08,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
