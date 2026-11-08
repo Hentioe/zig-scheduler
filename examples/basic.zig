@@ -3,6 +3,26 @@ const Io = std.Io;
 const scheduler = @import("zig_scheduler");
 const Job = scheduler.Job;
 
+const PrintJob = struct {
+    run_at: Io.Timestamp,
+
+    pub fn init(run_at: Io.Timestamp) @This() {
+        return .{ .run_at = run_at };
+    }
+
+    pub fn run(self: *@This()) void {
+        std.log.info("Running job scheduled at: {any}", .{self.run_at});
+    }
+
+    pub fn runAt(self: *const @This()) Io.Timestamp {
+        return self.run_at;
+    }
+
+    pub fn lessThan(self: *const @This(), other: Job) std.math.Order {
+        return std.math.order(self.run_at.nanoseconds, other.runAt().nanoseconds);
+    }
+};
+
 pub fn main(init: std.process.Init) !void {
     var sched = try scheduler.create(init.io, init.gpa);
     defer sched.destroy();
@@ -10,11 +30,11 @@ pub fn main(init: std.process.Init) !void {
 
     const now = Io.Timestamp.now(init.io, .real);
     // 1 秒后的 job
-    const job1: Job = .{ .run_at = now.addDuration(.fromSeconds(1)) };
-    try sched.push(job1);
+    var job1 = PrintJob.init(now.addDuration(.fromSeconds(1)));
+    try sched.push(Job.from(&job1));
     // 3 秒后的 job
-    const job2: Job = .{ .run_at = now.addDuration(.fromSeconds(3)) };
-    try sched.push(job2);
+    var job2 = PrintJob.init(now.addDuration(.fromSeconds(3)));
+    try sched.push(Job.from(&job2));
 
     // 暂停 5 秒
     init.io.sleep(.fromSeconds(5), .awake) catch {};

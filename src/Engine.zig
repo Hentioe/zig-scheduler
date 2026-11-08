@@ -51,6 +51,7 @@ pub fn start(self: *Self) !void {
     try self.is_started.wait(self.io);
 }
 
+/// 推送一个任务到引擎中。注意：调度器会借用任务，调用者保留任务实例的所有权。
 pub fn push(self: *Self, job: Job) !void {
     _ = self.active_pushes.fetchAdd(1, .monotonic);
     defer _ = self.active_pushes.fetchSub(1, .release);
@@ -82,7 +83,7 @@ fn schedule(self: *Self) void {
         // 启动所有到期任务
         const now = Io.Timestamp.now(self.io, .real);
         while (store.peek()) |top| {
-            if (top.run_at.compare(.gt, now)) break; // 跳过未到期的
+            if (top.runAt().compare(.gt, now)) break; // 跳过未到期的
             _ = store.pop(); // 从顶部移除
             top.run(); // 执行任务
         }
@@ -90,7 +91,7 @@ fn schedule(self: *Self) void {
         // 检查下一个任务
         if (timer) |*t| t.cancel(self.io); // 取消旧定时器
         if (store.peek()) |top| { // 如果堆顶还有任务，启动新的定时器
-            timer = self.io.concurrent(alarm, .{ self, now.durationTo(top.run_at) }) catch |err| {
+            timer = self.io.concurrent(alarm, .{ self, now.durationTo(top.runAt()) }) catch |err| {
                 log.err("Failed to start alarm: {}", .{err});
                 self.receiver.close(self.io); // 关闭队列，避免无意义阻塞
                 break;

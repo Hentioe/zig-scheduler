@@ -3,3 +3,7 @@ pub const Engine = @import("Engine.zig");
 pub const Job = @import("Job.zig");
 pub const create = Engine.create;
 pub const destroy = Engine.destroy;
+
+test {
+    _ = Job;
+}
