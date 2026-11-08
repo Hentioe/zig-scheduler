@@ -3,6 +3,7 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const Job = @import("Job.zig");
 const JobPriorityQueue = std.PriorityQueue(Job, void, Job.lessThan);
+const Executor = @import("Executor.zig");
 const Self = @This();
 
 pub const log = std.log.scoped(.scheduler);
@@ -15,6 +16,7 @@ io: Io,
 allocator: Allocator,
 receiver: Io.Queue(Message),
 scheduler: ?Io.Future(void) = null,
+executor: Executor,
 buffer: []Message,
 is_started: Io.Event = .unset,
 active_pushes: std.atomic.Value(usize) = .init(0),
@@ -29,6 +31,7 @@ pub fn create(io: Io, allocator: Allocator) !*Self {
         .allocator = allocator,
         .buffer = buffer,
         .receiver = .init(buffer),
+        .executor = Executor.init(io),
     };
 
     return ptr;
@@ -37,7 +40,8 @@ pub fn create(io: Io, allocator: Allocator) !*Self {
 pub fn destroy(self: *Self) void {
     std.debug.assert(self.is_started.isSet());
     self.receiver.close(self.io);
-    if (self.scheduler) |*s| _ = s.cancel(self.io);
+    if (self.scheduler) |*s| _ = s.await(self.io);
+    self.executor.deinit();
     while (self.active_pushes.load(.acquire) != 0) { // 等待所有正在推送的任务完成
         std.atomic.spinLoopHint();
     }
@@ -82,10 +86,13 @@ fn schedule(self: *Self) void {
 
         // 启动所有到期任务
         const now = Io.Timestamp.now(self.io, .real);
-        while (store.peek()) |top| {
-            if (top.runAt().compare(.gt, now)) break; // 跳过未到期的
+        while (store.peek()) |job| {
+            if (job.runAt().compare(.gt, now)) break; // 跳过未到期的
+            self.executor.submit(job) catch |err| {
+                log.err("Failed to submit job: {}", .{err});
+                continue;
+            };
             _ = store.pop(); // 从顶部移除
-            top.run(); // 执行任务
         }
 
         // 检查下一个任务
