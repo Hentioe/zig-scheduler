@@ -1,7 +1,6 @@
 const std = @import("std");
 const scheduler = @import("zig_scheduler");
-const Job = scheduler.Job;
-const DelayJob = scheduler.DelayJob;
+const Delay = scheduler.Delay;
 
 fn printId(context: ?*anyopaque) void {
     const id: *const usize = @ptrCast(@alignCast(context.?));
@@ -15,10 +14,10 @@ pub fn main(init: std.process.Init) !void {
     defer sched.destroy();
     try sched.start();
 
-    var job1 = DelayJob.init(init.io, .fromSeconds(1), printId, &first_id);
-    try sched.push(Job.from(&job1));
-    var job2 = DelayJob.init(init.io, .fromSeconds(3), printId, &second_id);
-    try sched.push(Job.from(&job2));
+    var print1 = Delay.init(init.io, .fromSeconds(1), printId, &first_id);
+    try sched.push(print1.toJob());
+    var print2 = Delay.init(init.io, .fromSeconds(3), printId, &second_id);
+    try sched.push(print2.toJob());
 
     init.io.sleep(.fromSeconds(5), .awake) catch {};
 }

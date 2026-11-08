@@ -27,6 +27,10 @@ pub fn lessThan(self: *const Self, other: Job) std.math.Order {
     return std.math.order(self.run_at.nanoseconds, other.runAt().nanoseconds);
 }
 
+pub fn toJob(self: *Self) Job {
+    return Job.from(self);
+}
+
 test "delay determines scheduled time and callback runs through the job interface" {
     const io = Io.Threaded.global_single_threaded.io();
     const Callback = struct {
