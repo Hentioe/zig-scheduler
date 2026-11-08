@@ -6,6 +6,9 @@ const JobPriorityQueue = std.PriorityQueue(Job, void, Job.lessThan);
 const Executor = @import("Executor.zig");
 const Self = @This();
 
+pub const StartError = Io.ConcurrentError || Io.Cancelable;
+pub const PushError = Io.QueueClosedError || Io.Cancelable || error{NotStarted};
+
 pub const log = std.log.scoped(.scheduler);
 pub const Message = union(enum) {
     tick,
@@ -21,7 +24,7 @@ buffer: []Message,
 is_started: Io.Event = .unset,
 active_pushes: std.atomic.Value(usize) = .init(0),
 
-pub fn create(io: Io, allocator: Allocator) !*Self {
+pub fn create(io: Io, allocator: Allocator) Allocator.Error!*Self {
     const ptr = try allocator.create(Self);
     errdefer allocator.destroy(ptr);
     const buffer = try allocator.alloc(Message, 1024);
@@ -31,7 +34,7 @@ pub fn create(io: Io, allocator: Allocator) !*Self {
         .allocator = allocator,
         .buffer = buffer,
         .receiver = .init(buffer),
-        .executor = Executor.init(io),
+        .executor = .init(io),
     };
 
     return ptr;
@@ -49,18 +52,18 @@ pub fn destroy(self: *Self) void {
     self.allocator.destroy(self);
 }
 
-pub fn start(self: *Self) !void {
+pub fn start(self: *Self) StartError!void {
     std.debug.assert(!self.is_started.isSet());
     self.scheduler = try self.io.concurrent(schedule, .{self});
     try self.is_started.wait(self.io);
 }
 
 /// 推送一个任务到引擎中。注意：调度器会借用任务，调用者保留任务实例的所有权。
-pub fn push(self: *Self, job: Job) !void {
+pub fn push(self: *Self, job: Job) PushError!void {
     _ = self.active_pushes.fetchAdd(1, .monotonic);
     defer _ = self.active_pushes.fetchSub(1, .release);
 
-    if (!self.is_started.isSet()) return error.NotStarted;
+    if (!self.is_started.isSet()) return PushError.NotStarted;
     try self.receiver.putOne(self.io, .{ .add = job });
 }
 

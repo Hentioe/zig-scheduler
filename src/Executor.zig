@@ -16,6 +16,6 @@ pub fn deinit(self: *Self) void {
     self.futures.await(self.io) catch {};
 }
 
-pub fn submit(self: *Self, job: Job) !void {
+pub fn submit(self: *Self, job: Job) Io.ConcurrentError!void {
     try self.futures.concurrent(self.io, Job.run, .{job});
 }
