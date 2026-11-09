@@ -19,7 +19,7 @@ io: Io,
 allocator: Allocator,
 receiver: Io.Queue(Message),
 scheduler: ?Io.Future(void) = null,
-executor: Executor,
+executor: *Executor,
 buffer: []Message,
 is_started: Io.Event = .unset,
 active_pushes: std.atomic.Value(usize) = .init(0),
@@ -34,7 +34,7 @@ pub fn create(io: Io, allocator: Allocator) Allocator.Error!*Self {
         .allocator = allocator,
         .buffer = buffer,
         .receiver = .init(buffer),
-        .executor = .init(io),
+        .executor = try .create(io, allocator),
     };
 
     return ptr;
@@ -43,8 +43,8 @@ pub fn create(io: Io, allocator: Allocator) Allocator.Error!*Self {
 pub fn destroy(self: *Self) void {
     std.debug.assert(self.is_started.isSet());
     self.receiver.close(self.io);
-    if (self.scheduler) |*s| _ = s.await(self.io);
-    self.executor.deinit();
+    if (self.scheduler) |*s| _ = s.cancel(self.io);
+    self.executor.destroy();
     while (self.active_pushes.load(.acquire) != 0) { // 等待所有正在推送的任务完成
         std.atomic.spinLoopHint();
     }
@@ -55,6 +55,7 @@ pub fn destroy(self: *Self) void {
 pub fn start(self: *Self) StartError!void {
     std.debug.assert(!self.is_started.isSet());
     self.scheduler = try self.io.concurrent(schedule, .{self});
+    try self.executor.start();
     try self.is_started.wait(self.io);
 }
 
