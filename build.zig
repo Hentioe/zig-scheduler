@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    const examples = [_][]const u8{ "basic", "delay" };
+    const examples = [_][]const u8{ "basic", "delay", "every", "recurring" };
     for (examples) |name| {
         const example = b.addExecutable(.{
             .name = b.fmt("zig_scheduler_{s}", .{name}),

@@ -19,19 +19,11 @@ pub fn run(self: *Self) void {
     self.callback(self.context);
 }
 
-pub fn runAt(self: *const Self) Io.Timestamp {
-    return self.run_at;
-}
-
-pub fn lessThan(self: *const Self, other: Job) std.math.Order {
-    return std.math.order(self.run_at.nanoseconds, other.runAt().nanoseconds);
-}
-
-pub fn toJob(self: *Self) Job {
+pub fn job(self: *Self) Job {
     return Job.from(self);
 }
 
-test "delay determines scheduled time and callback runs through the job interface" {
+test "delay provides a run time and runs the callback through the job interface" {
     const io = Io.Threaded.global_single_threaded.io();
     const Callback = struct {
         fn run(context: ?*anyopaque) void {
@@ -44,14 +36,10 @@ test "delay determines scheduled time and callback runs through the job interfac
     const before = Io.Timestamp.now(io, .real).addDuration(delay);
     var delayed = Self.init(io, delay, Callback.run, &count);
     const after = Io.Timestamp.now(io, .real).addDuration(delay);
-    const job = Job.from(&delayed);
+    const interface = Job.from(&delayed);
 
-    try std.testing.expect(!job.runAt().compare(.lt, before));
-    try std.testing.expect(!job.runAt().compare(.gt, after));
-    job.run();
+    try std.testing.expect(!delayed.run_at.compare(.lt, before));
+    try std.testing.expect(!delayed.run_at.compare(.gt, after));
+    interface.run();
     try std.testing.expectEqual(@as(usize, 1), count);
-
-    var later = Self.init(io, .fromSeconds(4), Callback.run, &count);
-    try std.testing.expectEqual(std.math.Order.lt, Job.lessThan({}, job, Job.from(&later)));
-    try std.testing.expectEqual(std.math.Order.gt, Job.lessThan({}, Job.from(&later), job));
 }

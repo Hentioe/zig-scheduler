@@ -13,14 +13,6 @@ const PrintJob = struct {
     pub fn run(self: *@This()) void {
         std.log.info("Running job scheduled at: {any}", .{self.run_at});
     }
-
-    pub fn runAt(self: *const @This()) Io.Timestamp {
-        return self.run_at;
-    }
-
-    pub fn lessThan(self: *const @This(), other: Job) std.math.Order {
-        return std.math.order(self.run_at.nanoseconds, other.runAt().nanoseconds);
-    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -31,10 +23,10 @@ pub fn main(init: std.process.Init) !void {
     const now = Io.Timestamp.now(init.io, .real);
     // 1 秒后的 job
     var job1 = PrintJob.init(now.addDuration(.fromSeconds(1)));
-    try sched.push(Job.from(&job1));
+    try sched.pushAt(Job.from(&job1), job1.run_at);
     // 3 秒后的 job
     var job2 = PrintJob.init(now.addDuration(.fromSeconds(3)));
-    try sched.push(Job.from(&job2));
+    try sched.pushAt(Job.from(&job2), job2.run_at);
 
     // 暂停 5 秒
     init.io.sleep(.fromSeconds(5), .awake) catch {};

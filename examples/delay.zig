@@ -15,9 +15,9 @@ pub fn main(init: std.process.Init) !void {
     try sched.start();
 
     var print1 = Delay.init(init.io, .fromSeconds(1), printId, &first_id);
-    try sched.push(print1.toJob());
+    try sched.pushDelay(&print1);
     var print2 = Delay.init(init.io, .fromSeconds(3), printId, &second_id);
-    try sched.push(print2.toJob());
+    try sched.pushDelay(&print2);
 
     init.io.sleep(.fromSeconds(5), .awake) catch {};
 }
